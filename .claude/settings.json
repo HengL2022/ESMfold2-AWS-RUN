@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(aws sts get-caller-identity:*)",
+      "Bash(aws batch describe-jobs:*)",
+      "Bash(aws batch describe-compute-environments:*)",
+      "Bash(aws batch describe-job-queues:*)",
+      "Bash(aws batch describe-job-definitions:*)",
+      "Bash(aws batch list-jobs:*)",
+      "Bash(aws ecr describe-repositories:*)",
+      "Bash(aws ecr describe-images:*)",
+      "Bash(aws ecr-public describe-image-tags:*)",
+      "Bash(aws iam get-role:*)",
+      "Bash(aws iam get-instance-profile:*)",
+      "Bash(aws iam list-attached-role-policies:*)",
+      "Bash(aws s3 ls:*)",
+      "Bash(aws s3api head-bucket:*)",
+      "Bash(aws logs tail:*)",
+      "Bash(aws logs describe-log-streams:*)",
+      "Bash(aws ec2 describe-vpcs:*)",
+      "Bash(aws ec2 describe-subnets:*)",
+      "Bash(aws ec2 describe-security-groups:*)",
+      "Bash(aws service-quotas get-service-quota:*)",
+      "Bash(aws service-quotas list-service-quotas:*)",
+      "Bash(bash -n:*)",
+      "Bash(python3 -m py_compile:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate-edit.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

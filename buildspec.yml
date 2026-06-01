@@ -1,0 +1,21 @@
+version: 0.2
+
+# Used by AWS CodeBuild to build the GPU image on native linux/amd64 and push to ECR.
+# Expects env vars (set on the CodeBuild project): AWS_ACCOUNT_ID, IMAGE_URI.
+# CodeBuild sets AWS_DEFAULT_REGION automatically.
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to private ECR..."
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+      - echo "Logging in to public ECR (for the DLC base image)..."
+      - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+  build:
+    commands:
+      - echo "Building $IMAGE_URI"
+      - docker build -t "$IMAGE_URI" .
+  post_build:
+    commands:
+      - echo "Pushing $IMAGE_URI"
+      - docker push "$IMAGE_URI"
+      - echo "Build complete."

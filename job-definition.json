@@ -1,0 +1,46 @@
+{
+  "jobDefinitionName": "esmfold2-gpu-jobdef",
+  "type": "container",
+  "platformCapabilities": ["EC2"],
+  "parameters": {
+    "input_s3": "s3://REPLACE_BUCKET/inputs/demo.fasta",
+    "output_s3": "s3://REPLACE_BUCKET/results/demo/",
+    "model": "biohub/ESMFold2-Fast",
+    "num_loops": "3",
+    "num_sampling_steps": "50"
+  },
+  "containerProperties": {
+    "image": "REPLACE_IMAGE_URI",
+    "jobRoleArn": "REPLACE_JOB_ROLE_ARN",
+    "executionRoleArn": "REPLACE_EXECUTION_ROLE_ARN",
+    "command": [
+      "--input-s3", "Ref::input_s3",
+      "--output-s3", "Ref::output_s3",
+      "--model", "Ref::model",
+      "--num-loops", "Ref::num_loops",
+      "--num-sampling-steps", "Ref::num_sampling_steps"
+    ],
+    "resourceRequirements": [
+      { "type": "GPU", "value": "1" },
+      { "type": "VCPU", "value": "8" },
+      { "type": "MEMORY", "value": "30000" }
+    ],
+    "environment": [
+      { "name": "HF_HOME", "value": "/tmp/hf_cache" },
+      { "name": "HF_XET_HIGH_PERFORMANCE", "value": "1" },
+      { "name": "PYTORCH_CUDA_ALLOC_CONF", "value": "expandable_segments:True" }
+    ],
+    "linuxParameters": {
+      "sharedMemorySize": 8192
+    },
+    "logConfiguration": {
+      "logDriver": "awslogs"
+    }
+  },
+  "retryStrategy": {
+    "attempts": 1
+  },
+  "timeout": {
+    "attemptDurationSeconds": 7200
+  }
+}

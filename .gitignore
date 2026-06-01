@@ -1,0 +1,21 @@
+# Rendered files containing account IDs / ARNs / bucket names
+*.rendered.json
+env.sh
+
+# Local outputs (structures encode the sequence — keep internal data out of git)
+*.cif
+*.metrics.json
+results/
+
+# Internal input sequences — keep local, NEVER commit. The committable
+# Test_input/raw_input.example.fasta (CD5 + control + placeholders) shows the format.
+Test_input/raw_input.fasta
+Test_input/chains.fasta
+Test_input/complexes.json
+Test_input/control_only.json
+Test_input/*.json
+
+# OS / editor
+.DS_Store
+__pycache__/
+*.pyc
