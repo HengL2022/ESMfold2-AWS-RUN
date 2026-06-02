@@ -1,0 +1,51 @@
+# ESMFold2 binder-DESIGN image: the official binder_design.py loop (ESMFold2ExperimentalModel + ESMC)
+# on AWS Batch GPU. Separate from the folding image (Dockerfile) — this one needs esm@main + ANARCI.
+#
+# ANARCI must come from BIOCONDA (pre-built germline HMMs). The pip-from-git build fails — it shells out
+# to `muscle` and rebuilds the HMMs at install time. So we install anarci+hmmer with micromamba into a
+# SELF-CONTAINED env (its own python); `esm` pulls the CUDA torch wheel into that same env. One python,
+# no cross-python bridge. Base is the AWS DLC (public.ecr.aws) only for the OS + NVIDIA userspace libs +
+# to avoid Docker Hub pull limits in CodeBuild — its system torch is unused.
+ARG BASE_IMAGE=public.ecr.aws/deep-learning-containers/pytorch-inference:2.6.0-gpu-py312-cu124-ubuntu22.04-ec2-v1.72
+FROM ${BASE_IMAGE}
+
+# Pin the official esm to the reviewed commit (transitively pins the transformers fork with
+# ESMFold2ExperimentalModel + ESMCForMaskedLM). Do NOT float on main; re-pin deliberately.
+ARG ESM_REVISION=f652b471d29da828b31e9b7a9cf7d0a7803240f5
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git ca-certificates bzip2 curl build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+# micromamba binary (no Docker Hub image needed).
+RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj -C /usr/local/bin --strip-components=1 bin/micromamba
+
+# Self-contained env: python 3.12 + bioconda anarci/hmmer (pre-built HMMs; the official approach).
+RUN micromamba create -y -p /opt/env -c conda-forge -c bioconda \
+        python=3.12 "anarci>=2020.04.03" "hmmer=3.4" pip && \
+    micromamba clean -ay
+ENV PATH=/opt/env/bin:$PATH
+
+# esm@pin (brings the CUDA torch wheel + the transformers fork) + abnumber/biotite/boto3, into the env.
+RUN /opt/env/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/env/bin/pip install --no-cache-dir \
+        "esm @ git+https://github.com/Biohub/esm.git@${ESM_REVISION}" \
+        abnumber biotite boto3
+
+# HF cache at /models (ephemeral disk for P0; EFS mount for P1+).
+ENV HF_HOME=/models
+ENV HF_XET_HIGH_PERFORMANCE=1
+ENV PYTHONUNBUFFERED=1
+RUN mkdir -p /models
+
+WORKDIR /app
+COPY run_esmfold2_batch.py /app/run_esmfold2_batch.py
+COPY run_esmfold2_design.py /app/run_esmfold2_design.py
+COPY run_esmfold2_rank.py /app/run_esmfold2_rank.py
+COPY design/ /app/design/
+
+# Build-time smoke test: import the whole graph (no weights) so dependency problems fail the build.
+RUN /opt/env/bin/python -c "import torch, biotite, abnumber, anarci; from design.binder_design import ESMFold2Design; print('design image imports OK')"
+
+# Bare python (the env's) so the job def chooses the script (design / rank / warm-up).
+ENTRYPOINT ["/opt/env/bin/python"]

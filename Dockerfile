@@ -35,5 +35,6 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 COPY run_esmfold2_batch.py /app/run_esmfold2_batch.py
+COPY design/ /app/design/
 
 ENTRYPOINT ["python", "/app/run_esmfold2_batch.py"]

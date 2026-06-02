@@ -7,13 +7,9 @@ env.sh
 *.metrics.json
 results/
 
-# Internal input sequences — keep local, NEVER commit. The committable
-# Test_input/raw_input.example.fasta (CD5 + control + placeholders) shows the format.
-Test_input/raw_input.fasta
-Test_input/chains.fasta
-Test_input/complexes.json
-Test_input/control_only.json
-Test_input/*.json
+# Internal inputs / private campaign configs (target + antibody framework) — NEVER commit the dir.
+# The committed design_config.example.json shows the config format with placeholders only.
+Test_input/
 
 # OS / editor
 .DS_Store

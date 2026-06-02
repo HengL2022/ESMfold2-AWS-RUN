@@ -37,7 +37,7 @@ echo "Role: $CB_ROLE_ARN"
 
 echo "== 4. Package source -> S3 =="
 TMP_ZIP="$(mktemp -t cbsrc).zip"
-( cd "$ROOT" && zip -q "$TMP_ZIP" Dockerfile run_esmfold2_batch.py buildspec.yml )
+( cd "$ROOT" && zip -q -r "$TMP_ZIP" Dockerfile run_esmfold2_batch.py buildspec.yml design/ )
 aws s3 cp "$TMP_ZIP" "s3://${BUCKET}/codebuild/source.zip" >/dev/null
 rm -f "$TMP_ZIP"
 echo "Source: s3://${BUCKET}/codebuild/source.zip"

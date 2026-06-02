@@ -138,13 +138,35 @@ def fold_record(model, chains, num_loops: int, num_sampling_steps: int,
         seed=seed,
     )
 
-    cif_text = result.complex.to_mmcif()
-    # iptm is inter-chain pTM and is None for a single chain (the common VHH case);
-    # ptm/plddt can also be None depending on the model — guard all of them.
+    # With num_diffusion_samples > 1 the builder returns a LIST of per-sample results (each with
+    # .complex/.plddt/.ptm/.iptm); with 1 it returns a single result. Normalize to a list so the
+    # single-sample path (used by the original CD5 screen) is byte-for-byte unchanged.
+    samples = result if isinstance(result, list) else [result]
+
+    def _score(r):
+        # Rank samples for picking the representative structure: prefer interface confidence,
+        # then pTM, then mean pLDDT. iptm is None for a single chain (the common VHH case).
+        if getattr(r, "iptm", None) is not None:
+            return float(r.iptm)
+        if getattr(r, "ptm", None) is not None:
+            return float(r.ptm)
+        return float(r.plddt.mean()) if getattr(r, "plddt", None) is not None else -1.0
+
+    best = max(samples, key=_score)
+    iptms = [float(r.iptm) for r in samples if getattr(r, "iptm", None) is not None]
+    ptms = [float(r.ptm) for r in samples if getattr(r, "ptm", None) is not None]
+
+    cif_text = best.complex.to_mmcif()
+    # ptm/plddt/iptm can be None depending on the model — guard all of them. Across multiple
+    # diffusion samples we also report mean/max so a single noisy draw doesn't mislead.
     metrics = {
-        "plddt_mean": float(result.plddt.mean()) if result.plddt is not None else None,
-        "ptm": float(result.ptm) if result.ptm is not None else None,
-        "iptm": float(result.iptm) if result.iptm is not None else None,
+        "plddt_mean": float(best.plddt.mean()) if getattr(best, "plddt", None) is not None else None,
+        "ptm": float(best.ptm) if getattr(best, "ptm", None) is not None else None,
+        "iptm": float(best.iptm) if getattr(best, "iptm", None) is not None else None,
+        "n_diffusion_samples_returned": len(samples),
+        "iptm_mean": (sum(iptms) / len(iptms)) if iptms else None,
+        "iptm_max": max(iptms) if iptms else None,
+        "ptm_mean": (sum(ptms) / len(ptms)) if ptms else None,
     }
     return cif_text, metrics
 

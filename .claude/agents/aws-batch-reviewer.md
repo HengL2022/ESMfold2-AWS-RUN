@@ -12,7 +12,7 @@ Check, in priority order:
 
 2. **Cost & GPU footguns.** Compute environment `minvCpus` must be 0 (scale to zero when idle). `maxvCpus` controls concurrency (≈ maxvCpus / job-vCPUs simultaneous jobs) — flag values that imply more concurrent g5.2xlarge than intended or that exceed a likely GPU quota. Confirm instance types are GPU families (g4/g5/g6/p3/p4/p5/p6); a non-GPU type silently leaves jobs in RUNNABLE. Check `timeout.attemptDurationSeconds` exists so runaway jobs don't bill indefinitely.
 
-3. **Job-definition correctness.** Command parameter placeholders must use double braces `{{Ref::param}}` (bare `Ref::param` is passed literally). `resourceRequirements` must include GPU=1, and MEMORY must fit the instance (g5.2xlarge ≈ 32 GiB; leave headroom, e.g. ≤30000 MiB). `platformCapabilities` must be `["EC2"]` (Fargate has no GPU).
+3. **Job-definition correctness.** Command parameter placeholders must use **bare `Ref::param`** — this project's runtime passes double-brace `{{Ref::param}}` *literally* (argparse crash; documented runtime bug #1). Flag any `{{Ref::...}}` as a blocker. `resourceRequirements` must include GPU=1, and MEMORY must fit the instance (g4dn.2xlarge/g6e.2xlarge ≈ 32–64 GiB; leave headroom, e.g. ≤30000 MiB on a 32 GiB box). `platformCapabilities` must be `["EC2"]` (Fargate has no GPU). For the design/rank job defs, confirm the `command` entrypoint matches the intended script (`run_esmfold2_design.py` vs `run_esmfold2_rank.py`).
 
 4. **Reproducibility.** Dockerfile should pin `ESM_REVISION` (not float on a branch) and the run script should accept `--revision`. Flag a hardcoded DLC base-image `-v1.x` suffix that may be stale.
 

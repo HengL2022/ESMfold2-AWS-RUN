@@ -12,8 +12,8 @@ phases:
       - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
   build:
     commands:
-      - echo "Building $IMAGE_URI"
-      - docker build -t "$IMAGE_URI" .
+      - echo "Building $IMAGE_URI from ${DOCKERFILE:-Dockerfile}"
+      - docker build -f "${DOCKERFILE:-Dockerfile}" -t "$IMAGE_URI" .
   post_build:
     commands:
       - echo "Pushing $IMAGE_URI"

@@ -1,0 +1,41 @@
+{
+  "jobDefinitionName": "esmfold2-design-jobdef",
+  "type": "container",
+  "platformCapabilities": ["EC2"],
+  "parameters": {
+    "config_s3": "s3://REPLACE_BUCKET/design/demo/config.json",
+    "output_s3": "s3://REPLACE_BUCKET/design/demo/stage1/"
+  },
+  "containerProperties": {
+    "image": "REPLACE_IMAGE_URI",
+    "jobRoleArn": "REPLACE_JOB_ROLE_ARN",
+    "executionRoleArn": "REPLACE_EXECUTION_ROLE_ARN",
+    "command": [
+      "/app/run_esmfold2_design.py",
+      "--config-s3", "Ref::config_s3",
+      "--output-s3", "Ref::output_s3"
+    ],
+    "resourceRequirements": [
+      { "type": "GPU", "value": "1" },
+      { "type": "VCPU", "value": "8" },
+      { "type": "MEMORY", "value": "58000" }
+    ],
+    "environment": [
+      { "name": "HF_HOME", "value": "/models" },
+      { "name": "HF_XET_HIGH_PERFORMANCE", "value": "1" },
+      { "name": "PYTORCH_CUDA_ALLOC_CONF", "value": "expandable_segments:True" }
+    ],
+    "linuxParameters": {
+      "sharedMemorySize": 8192
+    },
+    "logConfiguration": {
+      "logDriver": "awslogs"
+    }
+  },
+  "retryStrategy": {
+    "attempts": 1
+  },
+  "timeout": {
+    "attemptDurationSeconds": 9000
+  }
+}

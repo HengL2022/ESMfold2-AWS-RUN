@@ -1,0 +1,19 @@
+{
+  "campaign_id": "campaign_v1",
+
+  "_target": "Provide ONE of target_name (a public built-in) or target_sequence (your own).",
+  "target_name": "pd-l1",
+  "target_sequence": null,
+
+  "_binder": "Provide ONE of binder_name (a public built-in prompt) or binder_template (your own).",
+  "binder_name": "minibinder",
+
+  "_private_framework": "To design with your own antibody framework, set binder_template + binder_cdr_lengths instead of binder_name. Keep this config out of version control (see .gitignore) so the framework stays private.",
+  "binder_template_EXAMPLE": "EVQLVESGGGLVQPGGSLRLSCAAS{hcdr1}...{hcdr2}...{hcdr3}...WGQGTLVTVSS",
+  "binder_cdr_lengths_EXAMPLE": {"hcdr1": [7, 10], "hcdr2": [6, 9], "hcdr3": [9, 20]},
+
+  "is_antibody": false,
+  "seed_base": 0,
+  "batch_size": 1,
+  "use_scaling_critics": false
+}

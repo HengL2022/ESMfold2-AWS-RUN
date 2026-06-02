@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "aws-api": {
+      "command": "uvx",
+      "args": ["awslabs.aws-api-mcp-server@latest"],
+      "env": {
+        "AWS_API_MCP_PROFILE_NAME": "esmfold2",
+        "AWS_REGION": "us-east-1",
+        "READ_OPERATIONS_ONLY": "true"
+      }
+    }
+  }
+}
