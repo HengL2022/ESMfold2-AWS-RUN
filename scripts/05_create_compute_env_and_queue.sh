@@ -10,8 +10,14 @@ INSTANCE_PROFILE_ARN="$(aws iam get-instance-profile --instance-profile-name "$I
 
 VPC_ID="$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true \
   --query 'Vpcs[0].VpcId' --output text --region "$AWS_REGION")"
-SUBNETS="$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID \
-  --query 'Subnets[].SubnetId' --output text --region "$AWS_REGION" | tr '\t' ',')"
+# Pin to the ODCR's AZ if RESERVATION_SUBNET is set; otherwise use all default-VPC subnets.
+# A capacity reservation is AZ-scoped, so Batch must launch in that single subnet to consume it.
+if [ -n "${RESERVATION_SUBNET:-}" ]; then
+  SUBNETS="$RESERVATION_SUBNET"
+else
+  SUBNETS="$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID \
+    --query 'Subnets[].SubnetId' --output text --region "$AWS_REGION" | tr '\t' ',')"
+fi
 SG_ID="$(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID Name=group-name,Values=default \
   --query 'SecurityGroups[0].GroupId' --output text --region "$AWS_REGION")"
 

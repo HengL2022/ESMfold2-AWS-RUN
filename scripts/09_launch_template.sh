@@ -8,9 +8,22 @@ set -euo pipefail
 LT_NAME="${LT_NAME:-esmfold2-gpu-lt}"
 ROOT_GB="${ROOT_GB:-100}"
 
+# Capacity-reservation block: target a specific ODCR by id if given, else express a preference
+# ("open" auto-uses any matching open reservation; that's how we consume the p5.4xlarge ODCR
+# without ec2:DescribeCapacityReservations permission). ODCRs are NOT Capacity Blocks, so no
+# InstanceMarketOptions are needed.
+if [ -n "${CAPACITY_RESERVATION_ID:-}" ]; then
+  CR_JSON="\"CapacityReservationSpecification\": { \"CapacityReservationTarget\": { \"CapacityReservationId\": \"${CAPACITY_RESERVATION_ID}\" } },"
+  echo "Launch template will TARGET capacity reservation ${CAPACITY_RESERVATION_ID}."
+else
+  CR_JSON="\"CapacityReservationSpecification\": { \"CapacityReservationPreference\": \"${CAPACITY_RESERVATION_PREFERENCE:-open}\" },"
+  echo "Launch template will use CapacityReservationPreference=${CAPACITY_RESERVATION_PREFERENCE:-open}."
+fi
+
 # /dev/xvda is the root device on the ECS-optimized Amazon Linux GPU AMI that Batch uses by default.
 LT_DATA=$(cat <<JSON
 {
+  ${CR_JSON}
   "BlockDeviceMappings": [
     {
       "DeviceName": "/dev/xvda",

@@ -41,10 +41,16 @@ if [ "$COUNT" -lt 2 ]; then
   echo "Array jobs require size >= 2. Use 06_submit_job.sh for a single record." >&2; exit 1
 fi
 
+# Fold params are env-overridable; defaults preserve the original 3/50/1 behaviour.
+NUM_LOOPS="${NUM_LOOPS:-3}"
+NUM_SAMPLING_STEPS="${NUM_SAMPLING_STEPS:-50}"
+NUM_DIFFUSION_SAMPLES="${NUM_DIFFUSION_SAMPLES:-1}"
+echo "Fold params: num_loops=${NUM_LOOPS} num_sampling_steps=${NUM_SAMPLING_STEPS} num_diffusion_samples=${NUM_DIFFUSION_SAMPLES}"
+
 aws batch submit-job \
   --job-name "esmfold2-${RUN_NAME}-$(date +%Y%m%d-%H%M%S)" \
   --job-queue "$JOB_QUEUE" \
   --job-definition "$JOB_DEF" \
   --array-properties "size=${COUNT}" \
-  --parameters "input_s3=${INPUT_S3},output_s3=${OUTPUT_S3},model=${MODEL_ID},num_loops=3,num_sampling_steps=50" \
+  --parameters "input_s3=${INPUT_S3},output_s3=${OUTPUT_S3},model=${MODEL_ID},num_loops=${NUM_LOOPS},num_sampling_steps=${NUM_SAMPLING_STEPS},num_diffusion_samples=${NUM_DIFFUSION_SAMPLES}" \
   --region "$AWS_REGION" --query jobId --output text

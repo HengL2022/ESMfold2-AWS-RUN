@@ -79,6 +79,48 @@ and a run `summary-*.json`.
 | Default | 3 | 50 | 1 |
 | Careful ranking | 3–5 | 50–100 | 2–8 |
 
+On a single H100, careful-ranking folds run **~13 s/complex** once the model is loaded — fold many records
+as **one job** (model loads once) rather than an array. See [Measured throughput](#measured-throughput-single-h100--p54xlarge).
+
+---
+
+## Visualize results (HTML report)
+
+Turn a folded screen into a **self-contained, offline HTML report** — a sortable leaderboard plus a
+drill-down page per top candidate with the full sequence, structure-derived matrices, and an interactive
+3D viewer. Runs locally (no AWS, no GPU); it only reads result files.
+
+```bash
+# 1. collect the screen's results locally (structures + metrics)
+aws s3 cp "s3://$BUCKET/results/cd5_screen/" results/cd5_screen/ --recursive
+
+# 2. build a leaderboard from the per-record metrics (if you don't already have one)
+python3 scripts/aggregate_cd5_leaderboard.py results/cd5_screen
+
+# 3. generate the report and open it
+python3 scripts/build_cd5_report.py --results-dir results/cd5_screen --out results/cd5_screen/report
+open results/cd5_screen/report/index.html
+```
+
+Input is any local directory holding `leaderboard.csv` + per-record `<id>.cif` + `<id>.metrics.json`
+(exactly the fold outputs). Flags: `--top-n` (detail pages, default 20), `--contact-threshold` (Å,
+default 8.0), `--out`. Needs only `numpy` + `jinja2` (`pip install numpy jinja2`); 3D viewer
+([3Dmol.js](https://3dmol.org)) is vendored into the report so nothing loads from the network.
+
+**What you get** under `<out>/`:
+- `index.html` — leaderboard of all records (client-sortable; POS/NEG controls badged; a calibration-gate
+  verdict comparing the positive vs negative controls; an iPTM strip-plot).
+- `pages/<id>.html` — for each top-N record: the chain-A (binder) sequence with **CDRs highlighted** +
+  the chain-B (target) sequence, the full `metrics.json`, three matrices derived from the `.cif`
+  (**binder×target interface contact map**, **full Cα–Cα distance matrix**, **per-residue pLDDT track**),
+  and a **3D structure viewer** with zoom / rotate / spin and toggles for style (cartoon / stick / sphere
+  / surface), coloring (chain / pLDDT / spectrum), and interface highlighting.
+- `assets/` — the vendored viewer + stylesheet (keep these alongside the HTML when sharing the folder).
+
+The report opens by double-clicking `index.html` — no web server and no internet required (the 3D viewer
+shows a fallback message only on browsers without WebGL). To regenerate and QA it in one step, use the
+`/report-preflight` skill.
+
 ---
 
 ## Design binders
@@ -134,6 +176,9 @@ aws s3 cp "s3://$BUCKET/design/campaign_v1/stage2/" results/campaign_v1/ --recur
 Candidates are ranked by ESMFold2 interface confidence averaged over the critic checkpoints, exactly as
 in the released method. Scale a campaign by raising the array `size` (more seeds) and/or `batch_size`.
 
+Each design takes **~16 min on a single H100** (~35 min on the L40S); array children run sequentially per
+GPU. See [Measured throughput](#measured-throughput-single-h100--p54xlarge).
+
 ---
 
 ## Configuration & cost
@@ -145,6 +190,66 @@ in the released method. Scale a campaign by raising the array `size` (more seeds
   (after confirming quota and budget).
 - First job on a fresh instance downloads model weights (a few minutes). For very large campaigns,
   consider mounting EFS as the Hugging Face cache (`HF_HOME`).
+
+### Running in another AWS region
+
+The only file you edit is **`scripts/env.sh`**: set `AWS_REGION` (and `AWS_DEFAULT_REGION`). `BUCKET` and
+`IMAGE_URI` derive from the region automatically, so nothing else needs hand-editing.
+
+ECR images and S3 buckets are **region-scoped**, so you must re-run the region-scoped setup in the new
+region before submitting jobs (IAM roles are global and are reused):
+
+```bash
+# after editing AWS_REGION in scripts/env.sh:
+source scripts/env.sh
+./scripts/01_create_bucket.sh        # new bucket in the new region
+./scripts/03_create_iam_roles.sh     # re-points the job role's S3 policy at the new bucket
+./scripts/10_codebuild.sh            # rebuild the fold image into the new region's ECR
+./scripts/10b_build_design.sh        # rebuild the design image into the new region's ECR
+./scripts/05_create_compute_env_and_queue.sh
+./scripts/09_launch_template.sh
+./scripts/04_register_job_definition.sh
+./scripts/13_register_design_jobdef.sh
+```
+
+Check your GPU vCPU quota in the new region (G-family → "Running On-Demand G and VT instances";
+P-family such as H100 → "Running On-Demand P instances").
+
+### Reserved capacity (Capacity Reservations / ODCR)
+
+To pin jobs to a reserved instance (e.g. a reserved H100), set in **`scripts/env.sh`**:
+
+- `INSTANCE_TYPE` — the reserved type (e.g. `p5.4xlarge`).
+- `MAX_VCPUS` — one instance's vCPU count, so Batch launches exactly one and never an extra on-demand one
+  (e.g. `16` for `p5.4xlarge`).
+- `RESERVATION_SUBNET` — the subnet in the reservation's **Availability Zone** (a Capacity Reservation is
+  AZ-scoped; Batch must launch there to consume it).
+- `CAPACITY_RESERVATION_PREFERENCE=open` to auto-use any matching **open** reservation, **or**
+  `CAPACITY_RESERVATION_ID=cr-…` to target a specific one.
+
+`scripts/05_create_compute_env_and_queue.sh` pins the compute environment to `RESERVATION_SUBNET`, and
+`scripts/09_launch_template.sh` injects the capacity-reservation block into the launch template. **Note:**
+an ODCR bills hourly until you **cancel it** (EC2 → Capacity Reservations → Cancel), independent of
+whether an instance is using it — disabling/scaling the compute env stops *instance* charges but not the
+reservation.
+
+### Measured throughput (single H100 / `p5.4xlarge`)
+
+Numbers below are per sample on one H100 for a ~470 aa VHH–antigen complex; the L40S figures are the
+prior baseline on `g6e.2xlarge`.
+
+| Workload | Settings | H100 per sample | L40S per sample |
+|---|---|---|---|
+| **Fold (complex)** | careful ranking (3 / 100 / 4) | **~13 s warm** (model loaded once) | — |
+| **Nanobody design** | 150 steps, 4 hero critics, `batch_size=1` | **~16 min** (incl. model load) | ~35 min |
+
+- **Folding:** the ~13 s is the warm, in-process fold cost; the *first* job on a fresh instance also pays
+  a one-time model download + cold-start (~6–7 min). On a single GPU, fold many records as **one job**
+  (pass a multi-record manifest to `06_submit_job.sh` — the model loads once) rather than an array (each
+  child reloads). Example: 53 complexes in one job ≈ **18 min** of compute (~33 min end-to-end incl.
+  instance launch + image pull + first download).
+- **Design:** ~16 min/design includes each job's model download/load; on one GPU array children run
+  sequentially (6 designs ≈ 1.5–1.7 h). About **2× faster than the L40S**.
 
 ## Safety
 

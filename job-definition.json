@@ -7,7 +7,8 @@
     "output_s3": "s3://REPLACE_BUCKET/results/demo/",
     "model": "biohub/ESMFold2-Fast",
     "num_loops": "3",
-    "num_sampling_steps": "50"
+    "num_sampling_steps": "50",
+    "num_diffusion_samples": "1"
   },
   "containerProperties": {
     "image": "REPLACE_IMAGE_URI",
@@ -18,7 +19,8 @@
       "--output-s3", "Ref::output_s3",
       "--model", "Ref::model",
       "--num-loops", "Ref::num_loops",
-      "--num-sampling-steps", "Ref::num_sampling_steps"
+      "--num-sampling-steps", "Ref::num_sampling_steps",
+      "--num-diffusion-samples", "Ref::num_diffusion_samples"
     ],
     "resourceRequirements": [
       { "type": "GPU", "value": "1" },
@@ -41,6 +43,6 @@
     "attempts": 1
   },
   "timeout": {
-    "attemptDurationSeconds": 7200
+    "attemptDurationSeconds": 10800
   }
 }

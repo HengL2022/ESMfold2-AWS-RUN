@@ -39,4 +39,23 @@ case "$file" in
     echo "Do NOT change gating/ranking (design_binder, critic scoring, losses). Run /check-upstream-drift to diff." >&2
     exit 2 ;;
 esac
+
+# --- Guard 3: offline-portability of the CD5 report (build_cd5_report.py output) -------------
+# The report under results/cd5_screen/report/ MUST open on file:// with no network: assets are
+# vendored locally and CIFs are inlined. An off-host http(s):// in a generated page's src=/href=
+# breaks portability. Generated HTML written directly -> blocker; the generator source -> advisory
+# reminder (a commented CDN *fallback* is allowed, so don't hard-fail the .py).
+case "$file" in
+  */results/cd5_screen/report/*.html|results/cd5_screen/report/*.html)
+    if grep -Eqi '(src|href)[[:space:]]*=[[:space:]]*["'"'"']https?://' "$file"; then
+      echo "Offline-portability break in $file: an off-host http(s):// asset in src=/href=." >&2
+      echo "Vendor it into assets/ (e.g. 3Dmol-min.js) and inline CIFs — the report must work on file:// offline." >&2
+      exit 2
+    fi ;;
+  */build_cd5_report.py|build_cd5_report.py|scripts/build_cd5_report.py)
+    if grep -Eqi '(src|href)[[:space:]]*=[[:space:]]*["'"'"']https?://' "$file"; then
+      echo "Reminder: $file emits an off-host http(s):// in a page src=/href=." >&2
+      echo "The report must be offline-portable: vendor assets into assets/ and inline CIFs. A commented CDN fallback is OK." >&2
+    fi ;;
+esac
 exit 0
